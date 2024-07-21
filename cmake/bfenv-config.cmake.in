@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Copyright(c) 2023 John Sanpe <sanpeqf@gmail.com>
+#
+
+@PACKAGE_INIT@
+
+set(BFENV_VERSION "@BFENV_VERSION@")
+set(BFENV_INCLUDE_DIR "@CMAKE_INSTALL_PREFIX@/include")
+set(BFENV_LIBRARY_DIR "@CMAKE_INSTALL_PREFIX@/lib")
+set(BFENV_FOUND true)
