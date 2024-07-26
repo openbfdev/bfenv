@@ -69,7 +69,7 @@ epoll_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
         }
 
         if (pfds[index].events) {
-            bfdev_log_err("poll unknow revents: %#x\n", pfds[index].events);
+            bfdev_log_err("epoll unknow revents: %#x\n", pfds[index].events);
             return -BFDEV_EIO;
         }
 
@@ -115,7 +115,13 @@ epoll_event_register(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
     if (bfenv_eproc_edge_test(&event->flags))
         pfd.events |= EPOLLET;
 
-    return epoll_ctl(sproc->epfd, EPOLL_CTL_ADD, event->fd, &pfd);
+    retval = epoll_ctl(sproc->epfd, EPOLL_CTL_ADD, event->fd, &pfd);
+    if (bfdev_unlikely(retval)) {
+        sproc->count--;
+        return retval;
+    }
+
+    return -BFDEV_ENOERR;
 }
 
 static void
