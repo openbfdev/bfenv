@@ -167,7 +167,7 @@ poll_create_eproc(const bfdev_alloc_t *alloc)
 {
     struct poll_eproc *sproc;
 
-    sproc = bfdev_malloc(alloc, sizeof(*sproc));
+    sproc = bfdev_zalloc(alloc, sizeof(*sproc));
     if (!sproc)
         return NULL;
 
