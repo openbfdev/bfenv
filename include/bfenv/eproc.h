@@ -60,6 +60,7 @@ struct bfenv_eproc_event {
 struct bfenv_eproc_timer {
     bfdev_heap_node_t node;
     time_t time;
+    bool pending;
 
     struct bfenv_eproc *eproc;
     bfenv_eproc_timer_cb_t func;
@@ -82,6 +83,12 @@ BFDEV_BITFLAGS(bfenv_eproc_read, __BFENV_EPROC_READ)
 BFDEV_BITFLAGS(bfenv_eproc_write, __BFENV_EPROC_WRITE)
 BFDEV_BITFLAGS(bfenv_eproc_edge, __BFENV_EPROC_EDGE)
 BFDEV_BITFLAGS(bfenv_eproc_blocking, __BFENV_EPROC_BLOCKING)
+
+static __bfdev_always_inline bool
+bfenv_eproc_timer_pending(const bfenv_eproc_timer_t *timer)
+{
+    return timer->pending;
+}
 
 extern int
 bfenv_eproc_event_add(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event);

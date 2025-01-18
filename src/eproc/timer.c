@@ -33,6 +33,7 @@ eproc_timer_first(bfenv_eproc_t *eproc)
 static void
 eproc_timer_add(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer, bfenv_msec_t timeout)
 {
+    timer->pending = true;
     timer->time = eproc->current_msec + timeout;
     bfdev_heap_insert(&eproc->timers, &timer->node, timer_cmp, NULL);
 }
@@ -40,6 +41,7 @@ eproc_timer_add(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer, bfenv_msec_t t
 static void
 eproc_timer_remove(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer)
 {
+    timer->pending = false;
     bfdev_heap_remove(&eproc->timers, &timer->node);
 }
 
