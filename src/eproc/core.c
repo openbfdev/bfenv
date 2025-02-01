@@ -206,7 +206,6 @@ bfenv_eproc_func_register(bfenv_eproc_func_t *func)
         return -BFDEV_EALREADY;
 
     bfdev_list_add(&eproc_funcs, &func->list);
-    bfdev_log_debug("register func '%s'\n", func->name);
 
     return -BFDEV_ENOERR;
 }
@@ -218,5 +217,4 @@ bfenv_eproc_func_unregister(bfenv_eproc_func_t *func)
         return;
 
     bfdev_list_del(&func->list);
-    bfdev_log_debug("unregister func '%s'\n", func->name);
 }

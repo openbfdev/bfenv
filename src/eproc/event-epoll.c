@@ -68,7 +68,7 @@ epoll_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
             pending = true;
         }
 
-        if(pfds[index].events & EPOLLRDHUP) {
+        if (pfds[index].events & EPOLLRDHUP) {
             pfds[index].events &= ~EPOLLRDHUP;
             bfenv_eproc_eof_set(&flags);
             pending = true;

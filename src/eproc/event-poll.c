@@ -71,7 +71,7 @@ poll_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
         }
 
 #ifdef __USE_GNU
-        if(pfds[index].events & POLLRDHUP) {
+        if (pfds[index].events & POLLRDHUP) {
             pfds[index].events &= ~POLLRDHUP;
             bfenv_eproc_eof_set(&flags);
             pending = true;
