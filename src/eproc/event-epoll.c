@@ -68,10 +68,20 @@ epoll_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
             pending = true;
         }
 
-        if (pfds[index].events) {
-            bfdev_log_err("epoll unknow revents: %#x\n", pfds[index].events);
-            return -BFDEV_EIO;
+        if(pfds[index].events & EPOLLRDHUP) {
+            pfds[index].events &= ~EPOLLRDHUP;
+            bfenv_eproc_eof_set(&flags);
+            pending = true;
         }
+
+        if (pfds[index].events & (EPOLLERR | EPOLLHUP)) {
+            pfds[index].events &= ~(EPOLLERR | EPOLLHUP);
+            bfenv_eproc_error_set(&flags);
+            pending = true;
+        }
+
+        if (pfds[index].events)
+            bfdev_log_warn("epoll unknow revents: %#x\n", pfds[index].events);
 
         if (pending) {
             event = pfds[index].data.ptr;

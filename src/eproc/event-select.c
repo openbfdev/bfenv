@@ -26,7 +26,7 @@ select_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
 {
     struct select_eproc *sproc;
     bfenv_eproc_event_t **evslot;
-    fd_set read_fds, write_fds;
+    fd_set read_fds, write_fds, error_fds;
     struct timeval tv, *tvp;
     int index, ready, nready;
 
@@ -43,7 +43,7 @@ select_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
     write_fds = sproc->write_fds;
 
     bfdev_radix_last(&sproc->fdmap, &index);
-    ready = select(index + 1, &read_fds, &write_fds, NULL, tvp);
+    ready = select(index + 1, &read_fds, &write_fds, &error_fds, tvp);
     if (bfdev_unlikely(ready < 0)) {
         bfdev_log_alert("select wait failed: %d\n", ready);
         return -BFDEV_EIO;
@@ -76,6 +76,16 @@ select_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
 
         if (FD_ISSET(index, &write_fds)) {
             bfenv_eproc_write_set(&event->events);
+            pending = true;
+        }
+
+        if (FD_ISSET(index, &write_fds)) {
+            bfenv_eproc_write_set(&event->events);
+            pending = true;
+        }
+
+        if (FD_ISSET(index, &error_fds)) {
+            bfenv_eproc_error_set(&event->events);
             pending = true;
         }
 

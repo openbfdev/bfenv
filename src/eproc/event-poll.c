@@ -70,10 +70,22 @@ poll_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
             pending = true;
         }
 
-        if (pfds[index].revents) {
-            bfdev_log_err("poll unknow revents: %#x\n", pfds[index].revents);
-            return -BFDEV_EIO;
+#ifdef __USE_GNU
+        if(pfds[index].events & POLLRDHUP) {
+            pfds[index].events &= ~POLLRDHUP;
+            bfenv_eproc_eof_set(&flags);
+            pending = true;
         }
+#endif
+
+        if (pfds[index].events & (POLLERR | POLLHUP)) {
+            pfds[index].events &= ~(POLLERR | POLLHUP);
+            bfenv_eproc_error_set(&flags);
+            pending = true;
+        }
+
+        if (pfds[index].revents)
+            bfdev_log_warn("poll unknow revents: %#x\n", pfds[index].revents);
 
         if (pending) {
             evslot = bfdev_radix_find(&sproc->fdmap, pfds[index].fd);
