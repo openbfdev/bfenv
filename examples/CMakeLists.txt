@@ -4,3 +4,4 @@
 #
 
 add_subdirectory(eproc)
+add_subdirectory(iothread)
