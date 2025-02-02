@@ -36,6 +36,21 @@ eproc_funcs_find(const char *name)
     return NULL;
 }
 
+static long
+eproc_event_cmp(const bfdev_ilist_node_t *key1,
+                const bfdev_ilist_node_t *key2, void *pdata)
+{
+    int prio1, prio2;
+
+    prio1 = bfdev_container_of(key1, bfenv_eproc_event_t, node)->priority;
+    prio2 = bfdev_container_of(key2, bfenv_eproc_event_t, node)->priority;
+
+    if (prio1 == prio2)
+        return 0;
+
+    return bfdev_cmp(prio1 > prio2);
+}
+
 #include "times.c"
 #include "timer.c"
 
@@ -69,7 +84,7 @@ eproc_event_process(bfenv_eproc_t *eproc)
     bfenv_eproc_event_t *event, *tmp;
     int retval;
 
-    bfdev_list_for_each_entry_safe(event, tmp, &eproc->pending, node) {
+    bfdev_ilist_for_each_entry_safe(event, tmp, &eproc->pending, node) {
         retval = event->func(event, event->pdata);
         if (bfdev_unlikely(retval))
             return retval;
@@ -87,7 +102,7 @@ bfenv_eproc_run(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
 
     func = eproc->func;
     for (;;) {
-        bfdev_list_head_init(&eproc->pending);
+        bfdev_ilist_head_init(&eproc->pending);
         eproc_times_update(eproc);
         recent = bfdev_min(eproc_timer_timeout(eproc), timeout);
 
@@ -117,6 +132,13 @@ bfenv_eproc_run(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
     }
 
     return -BFDEV_ENOERR;
+}
+
+export void
+bfenv_eproc_event_pend(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
+{
+    bfdev_ilist_node_init(&event->node);
+    bfdev_ilist_add(&eproc->pending, &event->node, eproc_event_cmp, NULL);
 }
 
 export int
@@ -182,7 +204,6 @@ bfenv_eproc_create(const bfdev_alloc_t *alloc, const char *name)
     eproc->alloc = alloc;
     eproc->func = func;
 
-    bfdev_list_head_init(&eproc->pending);
     bfdev_heap_init(&eproc->timers);
     bfdev_rb_init(&eproc->processes);
     bfdev_rb_init(&eproc->signals);

@@ -44,16 +44,18 @@ struct bfenv_eproc {
     bfenv_eproc_func_t *func;
     bfenv_msec_t current_msec;
 
-    bfdev_list_head_t pending;
+    bfdev_ilist_head_t pending;
     bfdev_heap_root_t timers;
     bfdev_rb_root_t processes;
     bfdev_rb_root_t signals;
 };
 
 struct bfenv_eproc_event {
-    bfdev_list_head_t node;
-	unsigned long flags;
-	unsigned long events;
+    bfdev_ilist_node_t node;
+    int priority;
+
+    unsigned long flags;
+    unsigned long events;
     int fd;
 
     struct bfenv_eproc *eproc;
@@ -95,6 +97,9 @@ bfenv_eproc_timer_pending(const bfenv_eproc_timer_t *timer)
 {
     return timer->pending;
 }
+
+extern void
+bfenv_eproc_event_pend(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event);
 
 extern int
 bfenv_eproc_event_add(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event);

@@ -93,7 +93,7 @@ poll_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
 
             event = *evslot;
             event->events = flags;
-            bfdev_list_add(&eproc->pending, &event->node);
+            bfenv_eproc_event_pend(eproc, event);
             nready++;
         }
     }
