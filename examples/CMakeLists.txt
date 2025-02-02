@@ -3,5 +3,6 @@
 # Copyright(c) 2023 ffashion <helloworldffashion@gmail.com>
 #
 
+add_subdirectory(bfenv)
 add_subdirectory(eproc)
 add_subdirectory(iothread)

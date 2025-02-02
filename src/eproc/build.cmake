@@ -8,5 +8,11 @@ set(BFENV_SOURCE
     ${CMAKE_CURRENT_LIST_DIR}/core.c
     ${CMAKE_CURRENT_LIST_DIR}/event-select.c
     ${CMAKE_CURRENT_LIST_DIR}/event-poll.c
-    ${CMAKE_CURRENT_LIST_DIR}/event-epoll.c
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL Linux)
+    set(BFENV_SOURCE
+        ${BFENV_SOURCE}
+        ${CMAKE_CURRENT_LIST_DIR}/event-epoll.c
+    )
+endif()

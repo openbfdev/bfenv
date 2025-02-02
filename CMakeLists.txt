@@ -64,6 +64,7 @@ packed_header(
 )
 
 add_library(bfenv_object OBJECT ${BFENV_LIBRARY})
+target_link_libraries(bfenv_object bfdev pthread)
 add_library(bfenv ALIAS bfenv_object)
 
 if(BFENV_EXAMPLES)
@@ -71,14 +72,12 @@ if(BFENV_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-if(BFENV_TESTSUITE)
-    enable_testing()
-    add_subdirectory(testsuite)
-endif()
-
 if(${CMAKE_PROJECT_NAME} STREQUAL "bfenv")
     add_library(bfenv_static STATIC ${BFENV_LIBRARY})
     add_library(bfenv_shared SHARED ${BFENV_LIBRARY})
+
+    target_link_libraries(bfenv_static bfdev pthread)
+    target_link_libraries(bfenv_shared bfdev pthread)
 
     set_target_properties(bfenv_static
         PROPERTIES

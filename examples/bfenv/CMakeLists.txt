@@ -3,19 +3,19 @@
 # Copyright(c) 2023 John Sanpe <sanpeqf@gmail.com>
 #
 
-add_executable(simple simple.c)
-target_link_libraries(simple bfenv)
-add_test(simple simple)
+add_executable(bfenv-version version.c)
+target_link_libraries(bfenv-version bfenv)
+add_test(bfenv-version bfenv-version)
 
 if(${CMAKE_PROJECT_NAME} STREQUAL "bfenv")
     install(FILES
-        simple.c
+        version.c
         DESTINATION
-        ${CMAKE_INSTALL_DOCDIR}/examples/decoder
+        ${CMAKE_INSTALL_DOCDIR}/examples/bfenv
     )
 
     install(TARGETS
-        simple
+        bfenv-version
         DESTINATION
         ${CMAKE_INSTALL_DOCDIR}/bin
     )

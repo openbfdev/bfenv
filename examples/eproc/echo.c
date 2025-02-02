@@ -4,8 +4,14 @@
  */
 
 #include <bfenv/eproc.h>
-#include <arpa/inet.h>
+#include <bfdev/log.h>
+
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 static int
 client_echo(bfenv_eproc_event_t *event, void *pdata)
@@ -22,7 +28,7 @@ client_echo(bfenv_eproc_event_t *event, void *pdata)
         return 0;
     }
 
-    printf("Connection closed by peer\n");
+    bfdev_log_info("Connection closed by peer\n");
     shutdown(event->fd, 0);
 
     bfenv_eproc_event_remove(event->eproc, event);
@@ -52,7 +58,7 @@ server_accept(bfenv_eproc_event_t *event, void *pdata)
     cevent->flags = BFENV_EPROC_READ;
     cevent->func = client_echo;
 
-    printf("Connected by %s:%d\n", inet_ntoa(caddr.sin_addr), ntohs(caddr.sin_port));
+    bfdev_log_info("Connected by %s:%d\n", inet_ntoa(caddr.sin_addr), ntohs(caddr.sin_port));
     return bfenv_eproc_event_add(event->eproc, cevent);
 }
 
@@ -77,8 +83,8 @@ main(void)
         (retval = listen(ssock, 32)))
         return retval;
 
-    printf("Echo server is running on port %d\n", ntohs(saddr.sin_port));
-    eproc = bfenv_eproc_create(NULL, "epoll");
+    bfdev_log_info("Echo server is running on port %d\n", ntohs(saddr.sin_port));
+    eproc = bfenv_eproc_create(NULL, "select");
     if (!eproc)
         return 1;
 

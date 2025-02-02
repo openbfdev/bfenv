@@ -9,6 +9,8 @@
 #include <bfenv/eproc.h>
 #include <bfdev/log.h>
 #include <bfdev/radix.h>
+#include <bfdev/array.h>
+#include <bfdev/bug.h>
 #include <sys/poll.h>
 
 struct poll_eproc {

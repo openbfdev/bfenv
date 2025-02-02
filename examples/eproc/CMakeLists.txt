@@ -4,14 +4,14 @@
 #
 
 add_executable(eproc-echo echo.c)
-target_link_libraries(eproc-echo bfenv bfdev)
+target_link_libraries(eproc-echo bfenv)
 
 add_executable(eproc-prio prio.c)
-target_link_libraries(eproc-prio bfenv bfdev)
+target_link_libraries(eproc-prio bfenv)
 add_test(eproc-prio eproc-prio)
 
 add_executable(eproc-timer timer.c)
-target_link_libraries(eproc-timer bfenv bfdev)
+target_link_libraries(eproc-timer bfenv)
 add_test(eproc-timer eproc-timer)
 
 if(${CMAKE_PROJECT_NAME} STREQUAL "bfenv")

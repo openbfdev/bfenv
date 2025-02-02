@@ -10,6 +10,7 @@
 #include <bfdev/log.h>
 #include <bfdev/bug.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/eventfd.h>
 #include <export.h>
 
@@ -53,40 +54,70 @@ iothread_worker(void *pdata)
         BFDEV_BUG_ON(length != 1);
 
         switch (request.event) {
-            case BFENV_IOTHREAD_EVENT_READ:
-                retval = read(request.fd, request.buffer, request.size);
-                if (bfdev_unlikely(retval < 0)) {
-                    bfdev_log_err("worker read failed: %d\n", retval);
-                    goto failed;
-                }
+            case BFENV_IOTHREAD_EVENT_READ: {
+                void *buffer;
+                size_t count;
+                ssize_t rlen;
 
+                count = 0;
+                buffer = request.buffer;
+
+                do {
+                    rlen = read(request.fd, buffer, request.size - count);
+                    if (bfdev_unlikely(rlen < 0 && errno != EINTR)) {
+                        bfdev_log_notice("worker read failed: %d\n", errno);
+                        retval = errno;
+                        goto failed;
+                    }
+
+                    count += rlen;
+                    buffer += rlen;
+                } while (count < request.size);
+
+                request.size = count;
                 if (bfenv_iothread_sigread_test(iothread)) {
                     retval = iothread_signal(iothread, request);
                     if (bfdev_unlikely(retval)) {
-                        bfdev_log_err("worker send done signal failed: %d\n", retval);
+                        bfdev_log_notice("worker send done signal failed: %d\n", errno);
                         goto failed;
                     }
                 }
                 break;
+            }
 
-            case BFENV_IOTHREAD_EVENT_WRITE:
-                retval = write(request.fd, request.buffer, request.size);
-                if (bfdev_unlikely(retval < 0)) {
-                    bfdev_log_err("worker write failed: %d\n", retval);
-                    goto failed;
-                }
+            case BFENV_IOTHREAD_EVENT_WRITE: {
+                void *buffer;
+                size_t count;
+                ssize_t rlen;
 
+                count = 0;
+                buffer = request.buffer;
+
+                do {
+                    rlen = write(request.fd, buffer, request.size - count);
+                    if (bfdev_unlikely(rlen < 0 && errno != EINTR)) {
+                        bfdev_log_notice("worker write failed: %d\n", errno);
+                        retval = errno;
+                        goto failed;
+                    }
+
+                    count += rlen;
+                    buffer += rlen;
+                } while (count < request.size);
+
+                request.size = count;
                 if (bfenv_iothread_sigwrite_test(iothread)) {
                     retval = iothread_signal(iothread, request);
                     if (bfdev_unlikely(retval)) {
-                        bfdev_log_err("worker send write done signal failed: %d\n", retval);
+                        bfdev_log_notice("worker send write done signal failed: %d\n", retval);
                         goto failed;
                     }
                 }
                 break;
+            }
 
             default:
-                bfdev_log_err("worker unknown event: %d\n", request.event);
+                bfdev_log_notice("worker unknown event: %d\n", request.event);
                 retval = -BFDEV_EINVAL;
                 goto failed;
         }

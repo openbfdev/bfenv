@@ -6,9 +6,57 @@
 #ifndef _BFENV_CONFIG_H_
 #define _BFENV_CONFIG_H_
 
-#include <bfdev.h>
+#include <bfdev/config.h>
+#include <bfdev/macro.h>
 
 BFDEV_BEGIN_DECLS
+
+#define BFENV_VERSION_MAJOR ${PROJECT_VERSION_MAJOR}
+#define BFENV_VERSION_MINOR ${PROJECT_VERSION_MINOR}
+#define BFENV_VERSION_PATCH ${PROJECT_VERSION_PATCH}
+#define BFENV_VERSION_TWEAK ${PROJECT_VERSION_TWEAK}
+#define BFENV_EXTREVERSION ${BFENV_EXTREVERSION}
+
+#define BFENV_NAME ${BFENV_NAME}
+#define BFENV_VERSION ${BFENV_VERSION}
+#define BFENV_RELEASE "${BFENV_RELEASE}"
+
+#define BFENV_VERSION_CHECK(major, minor, patch) (  \
+    ((major) == BFENV_VERSION_MAJOR) &&             \
+    (((minor) < BFENV_VERSION_MINOR) ||             \
+     ((minor) == BFENV_VERSION_MINOR &&             \
+      (patch) <= BFENV_VERSION_PATCH))              \
+)
+
+static inline const char *
+bfenv_version(void)
+{
+    return __bfdev_stringify(BFENV_VERSION);
+}
+
+static inline const char *
+bfenv_release(void)
+{
+    return BFENV_RELEASE;
+}
+
+static inline int
+bfenv_version_major(void)
+{
+    return BFENV_VERSION_MAJOR;
+}
+
+static inline int
+bfenv_version_minor(void)
+{
+    return BFENV_VERSION_MINOR;
+}
+
+static inline int
+bfenv_version_patch(void)
+{
+    return BFENV_VERSION_PATCH;
+}
 
 BFDEV_END_DECLS
 

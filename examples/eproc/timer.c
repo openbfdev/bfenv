@@ -4,11 +4,12 @@
  */
 
 #include <bfenv/eproc.h>
+#include <bfdev/log.h>
 
 static int
 timer_func(bfenv_eproc_timer_t *timer, void *pdata)
 {
-    printf("%s\n", (const char *)pdata);
+    bfdev_log_info("%s\n", (const char *)pdata);
     return bfenv_eproc_timer_add(timer->eproc, timer, 200);
 }
 

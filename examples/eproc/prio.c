@@ -4,6 +4,7 @@
  */
 
 #include <bfenv/eproc.h>
+#include <bfdev/log.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -14,7 +15,7 @@ event_func(bfenv_eproc_event_t *ev, void *pdata)
 
     if (read(ev->fd, buff, sizeof(buff)) < 0)
         return 1;
-    printf("%s\n", buff);
+    bfdev_log_info("%s\n", buff);
 
     return 0;
 }
