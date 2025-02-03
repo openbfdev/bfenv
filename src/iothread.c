@@ -142,7 +142,7 @@ bfenv_iothread_append(bfenv_iothread_t *iothread, bfenv_iothread_request_t reque
 
     length = bfdev_fifo_put(&iothread->pending_works, request);
     if (bfdev_unlikely(length != 1))
-        return -BFDEV_ENOMEM;
+        return -BFDEV_EAGAIN;
 
     return sem_post(&iothread->work_pending);
 }
