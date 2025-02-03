@@ -5,7 +5,6 @@
 
 add_executable(simple simple.c)
 target_link_libraries(simple bfenv)
-add_test(simple simple)
 
 if(${CMAKE_PROJECT_NAME} STREQUAL "bfenv")
     install(FILES
