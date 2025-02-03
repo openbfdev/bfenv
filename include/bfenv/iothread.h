@@ -23,14 +23,17 @@ typedef enum bfenv_iothread_event bfenv_iothread_event_t;
 enum bfenv_iothread_flags {
     __BFENV_IOTHREAD_FLAGS_SIGREAD = 0,
     __BFENV_IOTHREAD_FLAGS_SIGWRITE,
+    __BFENV_IOTHREAD_FLAGS_SIGSYNC,
 
     BFENV_IOTHREAD_FLAGS_SIGREAD = BFDEV_BIT(__BFENV_IOTHREAD_FLAGS_SIGREAD),
     BFENV_IOTHREAD_FLAGS_SIGWRITE = BFDEV_BIT(__BFENV_IOTHREAD_FLAGS_SIGWRITE),
+    BFENV_IOTHREAD_FLAGS_SIGSYNC = BFDEV_BIT(__BFENV_IOTHREAD_FLAGS_SIGSYNC),
 };
 
 enum bfenv_iothread_event {
-    BFENV_IOTHREAD_EVENT_READ,
+    BFENV_IOTHREAD_EVENT_READ = 0,
     BFENV_IOTHREAD_EVENT_WRITE,
+    BFENV_IOTHREAD_EVENT_SYNC,
 };
 
 struct bfenv_iothread_request {
@@ -45,11 +48,11 @@ struct bfenv_iothread_request {
 struct bfenv_iothread {
     const bfdev_alloc_t *alloc;
     unsigned long flags;
-    int event_fd;
+    int eventfd;
 
     pthread_t worker_thread;
     pthread_mutex_t mutex;
-    sem_t work_pending;
+    sem_t pending;
 
     BFDEV_DECLARE_FIFO_DYNAMIC(pending_works, bfenv_iothread_request_t);
     BFDEV_DECLARE_FIFO_DYNAMIC(done_works, bfenv_iothread_request_t);
@@ -67,6 +70,12 @@ BFDEV_BITFLAGS_STRUCT(
     __BFENV_IOTHREAD_FLAGS_SIGWRITE
 );
 
+BFDEV_BITFLAGS_STRUCT(
+    bfenv_iothread_sigsync,
+    bfenv_iothread_t, flags,
+    __BFENV_IOTHREAD_FLAGS_SIGSYNC
+);
+
 extern int
 bfenv_iothread_append(bfenv_iothread_t *iothread, bfenv_iothread_request_t request);
 
@@ -79,12 +88,13 @@ bfenv_iothread_destory(bfenv_iothread_t *iothread);
 static inline int
 bfenv_iothread_read(bfenv_iothread_t *iothread, int fd, void *buffer, size_t nbytes)
 {
-    bfenv_iothread_request_t request = {
-        .event = BFENV_IOTHREAD_EVENT_READ,
-        .fd = fd,
-        .buffer = (void *)buffer,
-        .size = nbytes,
-    };
+    bfenv_iothread_request_t request;
+
+    request.event = BFENV_IOTHREAD_EVENT_READ;
+    request.fd = fd;
+    request.buffer = (void *)buffer;
+    request.size = nbytes;
+    request.error = 0;
 
     return bfenv_iothread_append(iothread, request);
 }
@@ -92,15 +102,28 @@ bfenv_iothread_read(bfenv_iothread_t *iothread, int fd, void *buffer, size_t nby
 static inline int
 bfenv_iothread_write(bfenv_iothread_t *iothread, int fd, const void *buffer, size_t nbytes)
 {
-    bfenv_iothread_request_t request = {
-        .event = BFENV_IOTHREAD_EVENT_WRITE,
-        .fd = fd,
-        .buffer = (void *)buffer,
-        .size = nbytes,
-    };
+    bfenv_iothread_request_t request;
+
+    request.event = BFENV_IOTHREAD_EVENT_WRITE;
+    request.fd = fd;
+    request.buffer = (void *)buffer;
+    request.size = nbytes;
+    request.error = 0;
 
     return bfenv_iothread_append(iothread, request);
 }
+
+static inline int
+bfenv_iothread_sync(bfenv_iothread_t *iothread, int fd, void *buffer, size_t nbytes)
+{
+    bfenv_iothread_request_t request;
+
+    request.event = BFENV_IOTHREAD_EVENT_SYNC;
+    request.error = 0;
+
+    return bfenv_iothread_append(iothread, request);
+}
+
 BFDEV_END_DECLS
 
 #endif /* _BFENV_IOTHREAD_H_ */

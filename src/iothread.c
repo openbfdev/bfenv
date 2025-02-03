@@ -27,7 +27,7 @@ iothread_signal(bfenv_iothread_t *iothread, bfenv_iothread_request_t request)
         sched_yield();
     }
 
-    retval = eventfd_write(iothread->event_fd, 1);
+    retval = eventfd_write(iothread->eventfd, 1);
     if (bfdev_unlikely(retval < 0))
         return retval;
 
@@ -39,42 +39,38 @@ iothread_worker(void *pdata)
 {
     bfenv_iothread_request_t request;
     bfenv_iothread_t *iothread;
-    unsigned long length;
+    unsigned long avail;
+    ssize_t length;
     int retval;
 
     iothread = pdata;
     retval = 0;
 
     for (;;) {
-        sem_wait(&iothread->work_pending);
+        sem_wait(&iothread->pending);
         if (bfdev_fifo_check_empty(&iothread->pending_works))
             continue;
 
-        length = bfdev_fifo_get(&iothread->pending_works, &request);
-        BFDEV_BUG_ON(length != 1);
+        avail = bfdev_fifo_get(&iothread->pending_works, &request);
+        BFDEV_BUG_ON(avail != 1);
 
         switch (request.event) {
             case BFENV_IOTHREAD_EVENT_READ: {
-                void *buffer;
-                size_t count;
-                ssize_t rlen;
+                for (;;) {
+                    length = read(request.fd, request.buffer, request.size);
+                    if (bfdev_unlikely(length < 0)) {
+                        if (errno == EINTR)
+                            continue;
 
-                count = 0;
-                buffer = request.buffer;
-
-                do {
-                    rlen = read(request.fd, buffer, request.size - count);
-                    if (bfdev_unlikely(rlen < 0 && errno != EINTR)) {
                         bfdev_log_notice("worker read failed: %d\n", errno);
                         retval = errno;
                         goto failed;
                     }
 
-                    count += rlen;
-                    buffer += rlen;
-                } while (count < request.size);
+                    break;
+                }
 
-                request.size = count;
+                request.size = length;
                 if (bfenv_iothread_sigread_test(iothread)) {
                     retval = iothread_signal(iothread, request);
                     if (bfdev_unlikely(retval)) {
@@ -88,21 +84,20 @@ iothread_worker(void *pdata)
             case BFENV_IOTHREAD_EVENT_WRITE: {
                 void *buffer;
                 size_t count;
-                ssize_t rlen;
 
                 count = 0;
                 buffer = request.buffer;
 
                 do {
-                    rlen = write(request.fd, buffer, request.size - count);
-                    if (bfdev_unlikely(rlen < 0 && errno != EINTR)) {
+                    length = write(request.fd, buffer, request.size - count);
+                    if (bfdev_unlikely(length < 0 && errno != EINTR)) {
                         bfdev_log_notice("worker write failed: %d\n", errno);
                         retval = errno;
                         goto failed;
                     }
 
-                    count += rlen;
-                    buffer += rlen;
+                    count += length;
+                    buffer += length;
                 } while (count < request.size);
 
                 request.size = count;
@@ -115,6 +110,28 @@ iothread_worker(void *pdata)
                 }
                 break;
             }
+
+            case BFENV_IOTHREAD_EVENT_SYNC:
+                for (;;) {
+                    retval = fsync(request.fd);
+                    if (bfdev_unlikely(retval < 0)) {
+                        if (errno == EINTR)
+                            continue;
+
+                        bfdev_log_notice("worker sync failed: %d\n", errno);
+                        retval = errno;
+                        goto failed;
+                    }
+                }
+
+                if (bfenv_iothread_sigsync_test(iothread)) {
+                    retval = iothread_signal(iothread, request);
+                    if (bfdev_unlikely(retval)) {
+                        bfdev_log_notice("worker send write done signal failed: %d\n", retval);
+                        goto failed;
+                    }
+                }
+                break;
 
             default:
                 bfdev_log_notice("worker unknown event: %d\n", request.event);
@@ -144,7 +161,7 @@ bfenv_iothread_append(bfenv_iothread_t *iothread, bfenv_iothread_request_t reque
     if (bfdev_unlikely(length != 1))
         return -BFDEV_EAGAIN;
 
-    return sem_post(&iothread->work_pending);
+    return sem_post(&iothread->pending);
 }
 
 export bfenv_iothread_t *
@@ -171,13 +188,13 @@ bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned l
         goto failed_free_pending_fifo;
     }
 
-    iothread->event_fd = eventfd(0, 0);
-    if (bfdev_unlikely(iothread->event_fd < 0)) {
+    iothread->eventfd = eventfd(0, 0);
+    if (bfdev_unlikely(iothread->eventfd < 0)) {
         bfdev_log_err("failed to create eventfd\n");
         goto failed_free_done_fifo;
     }
 
-    retval = sem_init(&iothread->work_pending, 0, 0);
+    retval = sem_init(&iothread->pending, 0, 0);
     if (bfdev_unlikely(retval)) {
         bfdev_log_err("failed to init read sem\n");
         goto failed_free_eventfd;
@@ -203,9 +220,9 @@ bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned l
 failed_mutex:
     pthread_mutex_destroy(&iothread->mutex);
 failed_free_sem:
-    sem_destroy(&iothread->work_pending);
+    sem_destroy(&iothread->pending);
 failed_free_eventfd:
-    close(iothread->event_fd);
+    close(iothread->eventfd);
 failed_free_done_fifo:
     bfdev_fifo_free(&iothread->done_works);
 failed_free_pending_fifo:
@@ -223,8 +240,8 @@ bfenv_iothread_destory(bfenv_iothread_t *iothread)
     alloc = iothread->alloc;
     pthread_cancel(iothread->worker_thread);
     pthread_mutex_destroy(&iothread->mutex);
-    sem_destroy(&iothread->work_pending);
-    close(iothread->event_fd);
+    sem_destroy(&iothread->pending);
+    close(iothread->eventfd);
 
     bfdev_fifo_free(&iothread->done_works);
     bfdev_fifo_free(&iothread->pending_works);

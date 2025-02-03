@@ -22,7 +22,7 @@ main(int argc, const char *argv[])
     int retval;
 
     iothread = bfenv_iothread_create(NULL, 8, BFENV_IOTHREAD_FLAGS_SIGREAD | BFENV_IOTHREAD_FLAGS_SIGWRITE);
-    pfd.fd = iothread->event_fd;
+    pfd.fd = iothread->eventfd;
     pfd.events = POLLIN;
 
     for (;;) {
@@ -32,7 +32,7 @@ main(int argc, const char *argv[])
             perror("poll");
             return retval;
         }
-        eventfd_read(iothread->event_fd, &signal);
+        eventfd_read(iothread->eventfd, &signal);
         (void)signal;
 
         bfenv_iothread_write(iothread, STDOUT_FILENO, buffer, TEST_BUFFER);
@@ -41,7 +41,7 @@ main(int argc, const char *argv[])
             perror("poll");
             return retval;
         }
-        eventfd_read(iothread->event_fd, &signal);
+        eventfd_read(iothread->eventfd, &signal);
         (void)signal;
     }
 
