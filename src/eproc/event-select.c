@@ -16,6 +16,7 @@ struct select_eproc {
     BFDEV_DECLARE_RADIX(fdmap, bfenv_eproc_event_t *);
     fd_set read_fds;
     fd_set write_fds;
+    fd_set error_fds;
 };
 
 #define eproc_to_select(ptr) \
@@ -41,9 +42,13 @@ select_fetch_events(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
 
     read_fds = sproc->read_fds;
     write_fds = sproc->write_fds;
+    error_fds = sproc->error_fds;
 
-    bfdev_radix_last(&sproc->fdmap, &index);
-    ready = select(index + 1, &read_fds, &write_fds, &error_fds, tvp);
+    /* when return null, it means any fd is not set */
+    if (bfdev_radix_last(&sproc->fdmap, &index))
+        index++;
+
+    ready = select(index, &read_fds, &write_fds, &error_fds, tvp);
     if (bfdev_unlikely(ready < 0)) {
         bfdev_log_alert("select wait failed: %d\n", ready);
         return -BFDEV_EIO;
@@ -135,11 +140,15 @@ select_event_register(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
     }
 
     *evslot = event;
-    if (bfenv_eproc_read_test(&event->flags))
+    if (bfenv_eproc_read_test(&event->flags)) {
         FD_SET(index, &sproc->read_fds);
+        FD_SET(index, &sproc->error_fds);
+    }
 
-    if (bfenv_eproc_write_test(&event->flags))
+    if (bfenv_eproc_write_test(&event->flags)) {
         FD_SET(index, &sproc->write_fds);
+        FD_SET(index, &sproc->error_fds);
+    }
 
     return -BFDEV_ENOERR;
 }
@@ -155,6 +164,7 @@ select_event_unregister(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
 
     FD_CLR(index, &sproc->read_fds);
     FD_CLR(index, &sproc->write_fds);
+    FD_CLR(index, &sproc->error_fds);
     bfdev_radix_free(&sproc->fdmap, index);
 }
 
