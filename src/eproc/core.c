@@ -3,8 +3,8 @@
 
 #include <bfenv/eproc.h>
 #include <bfdev/log.h>
+#include <bfdev/bug.h>
 #include <string.h>
-#include <sys/fcntl.h>
 #include <export.h>
 
 static
@@ -36,23 +36,9 @@ eproc_funcs_find(const char *name)
     return NULL;
 }
 
-static long
-eproc_event_cmp(const bfdev_ilist_node_t *key1,
-                const bfdev_ilist_node_t *key2, void *pdata)
-{
-    int prio1, prio2;
-
-    prio1 = bfdev_container_of(key1, bfenv_eproc_event_t, node)->priority;
-    prio2 = bfdev_container_of(key2, bfenv_eproc_event_t, node)->priority;
-
-    if (prio1 == prio2)
-        return 0;
-
-    return bfdev_cmp(prio1 > prio2);
-}
-
 #include "times.c"
 #include "timer.c"
+#include "event.c"
 
 static int
 eproc_timer_process(bfenv_eproc_t *eproc)
@@ -68,8 +54,9 @@ eproc_timer_process(bfenv_eproc_t *eproc)
             break;
 
         timer = eproc_timer_first(eproc);
-        eproc_timer_remove(eproc, timer);
+        BFDEV_BUG_ON(!timer);
 
+        bfenv_eproc_timer_remove(eproc, timer);
         retval = timer->func(timer, timer->pdata);
         if (retval)
             return retval;
@@ -81,12 +68,17 @@ eproc_timer_process(bfenv_eproc_t *eproc)
 static int
 eproc_event_process(bfenv_eproc_t *eproc)
 {
-    bfenv_eproc_event_t *event, *tmp;
+    bfenv_eproc_event_t *event;
     int retval;
 
-    bfdev_ilist_for_each_entry_safe(event, tmp, &eproc->pending, node) {
+    for (;;) {
+        event = eproc_event_first(eproc);
+        if (!event)
+            break;
+
+        eproc_event_remove(eproc, event);
         retval = event->func(event, event->pdata);
-        if (bfdev_unlikely(retval))
+        if (retval)
             return retval;
     }
 
@@ -102,7 +94,7 @@ bfenv_eproc_run(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
 
     func = eproc->func;
     for (;;) {
-        bfdev_ilist_head_init(&eproc->pending);
+        bfdev_heap_init(&eproc->events);
         eproc_times_update(eproc);
         recent = bfdev_min(eproc_timer_timeout(eproc), timeout);
 
@@ -132,59 +124,6 @@ bfenv_eproc_run(bfenv_eproc_t *eproc, bfenv_msec_t timeout)
     }
 
     return -BFDEV_ENOERR;
-}
-
-export void
-bfenv_eproc_event_pend(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
-{
-    bfdev_ilist_node_init(&event->node);
-    bfdev_ilist_add(&eproc->pending, &event->node, eproc_event_cmp, NULL);
-}
-
-export int
-bfenv_eproc_event_add(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
-{
-    bfenv_eproc_func_t *func;
-	unsigned int flags;
-    int retval;
-
-    func = eproc->func;
-    event->eproc = eproc;
-
-    if (!bfenv_eproc_blocking_test(&event->flags)) {
-		flags = fcntl(event->fd, F_GETFL, 0);
-		flags |= O_NONBLOCK;
-		fcntl(event->fd, F_SETFL, flags);
-	}
-
-    retval = func->event_register(eproc, event);
-    if (bfdev_unlikely(retval))
-        return retval;
-
-    return -BFDEV_ENOERR;
-}
-
-export void
-bfenv_eproc_event_remove(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event)
-{
-    bfenv_eproc_func_t *func;
-
-    func = eproc->func;
-    func->event_unregister(eproc, event);
-}
-
-export int
-bfenv_eproc_timer_add(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer, bfenv_msec_t timeout)
-{
-    timer->eproc = eproc;
-    eproc_timer_add(eproc, timer, timeout);
-    return -BFDEV_ENOERR;
-}
-
-export void
-bfenv_eproc_timer_remove(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer)
-{
-    eproc_timer_remove(eproc, timer);
 }
 
 export bfenv_eproc_t *

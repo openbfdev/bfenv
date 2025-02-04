@@ -11,8 +11,8 @@
 #include <bfdev/errno.h>
 #include <bfdev/bitflags.h>
 #include <bfdev/minmax.h>
-#include <bfdev/ilist.h>
 #include <bfdev/rbtree.h>
+#include <bfdev/list.h>
 #include <bfdev/heap.h>
 #include <bfdev/allocator.h>
 #include <time.h>
@@ -51,15 +51,16 @@ struct bfenv_eproc {
     bfenv_eproc_func_t *func;
     bfenv_msec_t current_msec;
 
-    bfdev_ilist_head_t pending;
+    bfdev_heap_root_t events;
     bfdev_heap_root_t timers;
     bfdev_rb_root_t processes;
     bfdev_rb_root_t signals;
 };
 
 struct bfenv_eproc_event {
-    bfdev_ilist_node_t node;
+    bfdev_heap_node_t node;
     int priority;
+    bool pending;
 
     unsigned long flags;
     unsigned long events;
@@ -106,7 +107,7 @@ bfenv_eproc_timer_pending(const bfenv_eproc_timer_t *timer)
 }
 
 extern void
-bfenv_eproc_event_pend(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event);
+bfenv_eproc_event_raise(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event);
 
 extern int
 bfenv_eproc_event_add(bfenv_eproc_t *eproc, bfenv_eproc_event_t *event);

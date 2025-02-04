@@ -4,6 +4,7 @@
  */
 
 #include <bfenv/eproc.h>
+#include <export.h>
 
 static inline long
 timer_cmp(const bfdev_heap_node_t *key1,
@@ -30,21 +31,6 @@ eproc_timer_first(bfenv_eproc_t *eproc)
     return timer;
 }
 
-static void
-eproc_timer_add(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer, bfenv_msec_t timeout)
-{
-    timer->pending = true;
-    timer->time = eproc->current_msec + timeout;
-    bfdev_heap_insert(&eproc->timers, &timer->node, timer_cmp, NULL);
-}
-
-static void
-eproc_timer_remove(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer)
-{
-    timer->pending = false;
-    bfdev_heap_remove(&eproc->timers, &timer->node);
-}
-
 static bfenv_msec_t
 eproc_timer_timeout(bfenv_eproc_t *eproc)
 {
@@ -58,4 +44,22 @@ eproc_timer_timeout(bfenv_eproc_t *eproc)
         return 0;
 
     return timer->time - eproc->current_msec;
+}
+
+export int
+bfenv_eproc_timer_add(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer, bfenv_msec_t timeout)
+{
+    timer->eproc = eproc;
+    timer->pending = true;
+    timer->time = eproc->current_msec + timeout;
+    bfdev_heap_insert(&eproc->timers, &timer->node, timer_cmp, NULL);
+
+    return -BFDEV_ENOERR;
+}
+
+export void
+bfenv_eproc_timer_remove(bfenv_eproc_t *eproc, bfenv_eproc_timer_t *timer)
+{
+    timer->pending = false;
+    bfdev_heap_remove(&eproc->timers, &timer->node);
 }
