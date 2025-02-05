@@ -10,6 +10,7 @@
 #include <semaphore.h>
 #include <bfdev/allocator.h>
 #include <bfdev/fifo.h>
+#include <bfdev/list.h>
 #include <bfdev/bitflags.h>
 
 BFDEV_BEGIN_DECLS
@@ -38,6 +39,7 @@ enum bfenv_iothread_event {
 
 struct bfenv_iothread_request {
     bfenv_iothread_event_t event;
+    bfdev_list_head_t pending;
     int error;
     int fd;
 
@@ -56,6 +58,7 @@ struct bfenv_iothread {
 
     BFDEV_DECLARE_FIFO_DYNAMIC(pending_works, bfenv_iothread_request_t);
     BFDEV_DECLARE_FIFO_DYNAMIC(done_works, bfenv_iothread_request_t);
+    bfdev_list_head_t pending_dones;
 };
 
 BFDEV_BITFLAGS_STRUCT(

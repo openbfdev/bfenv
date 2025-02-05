@@ -9,26 +9,72 @@
 #include <bfenv/iothread.h>
 #include <bfdev/log.h>
 #include <bfdev/bug.h>
+#include <bfdev/log2.h>
+#include <bfdev/minmax.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/eventfd.h>
 #include <export.h>
 
 static int
-iothread_signal(bfenv_iothread_t *iothread, bfenv_iothread_request_t request)
+iothread_signal_write(bfenv_iothread_t *iothread, bfenv_iothread_request_t request)
 {
+    unsigned long count;
     int retval;
 
-    for (;;) {
-        if (bfdev_fifo_put(&iothread->done_works, request) == 1)
-            break;
-
-        /* TODO: sleep thread */
-        sched_yield();
-    }
+    count = bfdev_fifo_put(&iothread->done_works, request);
+    BFDEV_BUG_ON(count != 1);
 
     retval = eventfd_write(iothread->eventfd, 1);
     if (bfdev_unlikely(retval < 0))
+        return retval;
+
+    return -BFDEV_ENOERR;
+}
+
+static int
+iothread_signal_flush(bfenv_iothread_t *iothread)
+{
+    bfenv_iothread_request_t *peek;
+    int retval;
+
+    for (;;) {
+        if (bfdev_fifo_check_full(&iothread->done_works))
+            break;
+
+        peek = bfdev_list_last_entry_or_null(
+            &iothread->pending_dones,
+            bfenv_iothread_request_t, pending
+        );
+        if (bfdev_unlikely(!peek))
+            break;
+
+        retval = iothread_signal_write(iothread, *peek);
+        if (bfdev_unlikely(retval))
+            return retval;
+
+        bfdev_list_del(&peek->pending);
+        bfdev_free(iothread->alloc, peek);
+    }
+
+    return -BFDEV_ENOERR;
+}
+
+static int
+iothread_signal(bfenv_iothread_t *iothread, bfenv_iothread_request_t request)
+{
+    bfenv_iothread_request_t *pending;
+    int retval;
+
+    pending = bfdev_malloc(iothread->alloc, sizeof(*pending));
+    if (bfdev_unlikely(!pending))
+        return -BFDEV_ENOMEM;
+
+    *pending = request;
+    bfdev_list_add(&iothread->pending_dones, &pending->pending);
+
+    retval = iothread_signal_flush(iothread);
+    if (bfdev_unlikely(retval))
         return retval;
 
     return -BFDEV_ENOERR;
@@ -176,6 +222,9 @@ bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned l
         return NULL;
     }
 
+    bfdev_max_adj(depth, 2);
+    depth = bfdev_pow2_roundup(depth);
+
     retval = bfdev_fifo_alloc(&iothread->pending_works, alloc, depth);
     if (bfdev_unlikely(retval)) {
         bfdev_log_err("failed to alloc pending fifo\n");
@@ -208,6 +257,7 @@ bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned l
 
     iothread->alloc = alloc;
     iothread->flags = flags;
+    bfdev_list_head_init(&iothread->pending_dones);
 
     retval = pthread_create(&iothread->worker_thread, NULL, iothread_worker, iothread);
     if (bfdev_unlikely(retval)) {
@@ -235,6 +285,7 @@ failed_free_alloc:
 extern void
 bfenv_iothread_destory(bfenv_iothread_t *iothread)
 {
+    bfenv_iothread_request_t *pending, *tmp;
     const bfdev_alloc_t *alloc;
 
     alloc = iothread->alloc;
@@ -242,6 +293,10 @@ bfenv_iothread_destory(bfenv_iothread_t *iothread)
     pthread_mutex_destroy(&iothread->mutex);
     sem_destroy(&iothread->pending);
     close(iothread->eventfd);
+
+    bfdev_list_for_each_entry_safe(pending, tmp,
+        &iothread->pending_dones, pending)
+        bfdev_free(alloc, pending);
 
     bfdev_fifo_free(&iothread->done_works);
     bfdev_fifo_free(&iothread->pending_works);
