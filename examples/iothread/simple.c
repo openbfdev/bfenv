@@ -21,7 +21,7 @@ main(int argc, const char *argv[])
     char buffer[TEST_BUFFER];
     int retval;
 
-    iothread = bfenv_iothread_create(NULL, 8, BFENV_IOTHREAD_FLAGS_SIGREAD | BFENV_IOTHREAD_FLAGS_SIGWRITE);
+    iothread = bfenv_iothread_create(NULL, 8, BFENV_IOTHREAD_SIGREAD | BFENV_IOTHREAD_SIGWRITE);
     pfd.fd = iothread->eventfd;
     pfd.events = POLLIN;
 

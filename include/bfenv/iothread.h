@@ -20,15 +20,16 @@ typedef struct bfenv_iothread_request bfenv_iothread_request_t;
 typedef enum bfenv_iothread_signal bfenv_iothread_signal_t;
 typedef enum bfenv_iothread_flags bfenv_iothread_flags_t;
 typedef enum bfenv_iothread_event bfenv_iothread_event_t;
+typedef enum bfenv_iothread_state bfenv_iothread_state_t;
 
 enum bfenv_iothread_flags {
-    __BFENV_IOTHREAD_FLAGS_SIGREAD = 0,
-    __BFENV_IOTHREAD_FLAGS_SIGWRITE,
-    __BFENV_IOTHREAD_FLAGS_SIGSYNC,
+    __BFENV_IOTHREAD_SIGREAD = 0,
+    __BFENV_IOTHREAD_SIGWRITE,
+    __BFENV_IOTHREAD_SIGSYNC,
 
-    BFENV_IOTHREAD_FLAGS_SIGREAD = BFDEV_BIT(__BFENV_IOTHREAD_FLAGS_SIGREAD),
-    BFENV_IOTHREAD_FLAGS_SIGWRITE = BFDEV_BIT(__BFENV_IOTHREAD_FLAGS_SIGWRITE),
-    BFENV_IOTHREAD_FLAGS_SIGSYNC = BFDEV_BIT(__BFENV_IOTHREAD_FLAGS_SIGSYNC),
+    BFENV_IOTHREAD_SIGREAD = BFDEV_BIT(__BFENV_IOTHREAD_SIGREAD),
+    BFENV_IOTHREAD_SIGWRITE = BFDEV_BIT(__BFENV_IOTHREAD_SIGWRITE),
+    BFENV_IOTHREAD_SIGSYNC = BFDEV_BIT(__BFENV_IOTHREAD_SIGSYNC),
 };
 
 enum bfenv_iothread_event {
@@ -53,8 +54,8 @@ struct bfenv_iothread {
     int eventfd;
 
     pthread_t worker_thread;
-    pthread_mutex_t mutex;
     sem_t pending;
+    int error;
 
     BFDEV_DECLARE_FIFO_DYNAMIC(pending_works, bfenv_iothread_request_t);
     BFDEV_DECLARE_FIFO_DYNAMIC(done_works, bfenv_iothread_request_t);
@@ -64,19 +65,19 @@ struct bfenv_iothread {
 BFDEV_BITFLAGS_STRUCT(
     bfenv_iothread_sigread,
     bfenv_iothread_t, flags,
-    __BFENV_IOTHREAD_FLAGS_SIGREAD
+    __BFENV_IOTHREAD_SIGREAD
 );
 
 BFDEV_BITFLAGS_STRUCT(
     bfenv_iothread_sigwrite,
     bfenv_iothread_t, flags,
-    __BFENV_IOTHREAD_FLAGS_SIGWRITE
+    __BFENV_IOTHREAD_SIGWRITE
 );
 
 BFDEV_BITFLAGS_STRUCT(
     bfenv_iothread_sigsync,
     bfenv_iothread_t, flags,
-    __BFENV_IOTHREAD_FLAGS_SIGSYNC
+    __BFENV_IOTHREAD_SIGSYNC
 );
 
 extern int

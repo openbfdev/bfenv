@@ -93,12 +93,16 @@ iothread_worker(void *pdata)
     retval = 0;
 
     for (;;) {
-        sem_wait(&iothread->pending);
-        if (bfdev_fifo_check_empty(&iothread->pending_works))
-            continue;
+        retval = sem_wait(&iothread->pending);
+        if (bfdev_unlikely(retval)) {
+            bfdev_log_notice("worker semaphore wait failed: %d\n", errno);
+            retval = errno;
+            goto eexit;
+        }
 
         avail = bfdev_fifo_get(&iothread->pending_works, &request);
-        BFDEV_BUG_ON(avail != 1);
+        if (!avail)
+            continue;
 
         switch (request.event) {
             case BFENV_IOTHREAD_EVENT_READ: {
@@ -120,8 +124,8 @@ iothread_worker(void *pdata)
                 if (bfenv_iothread_sigread_test(iothread)) {
                     retval = iothread_signal(iothread, request);
                     if (bfdev_unlikely(retval)) {
-                        bfdev_log_notice("worker send done signal failed: %d\n", errno);
-                        goto failed;
+                        bfdev_log_notice("worker send read signal failed: %d\n", errno);
+                        goto eexit;
                     }
                 }
                 break;
@@ -150,8 +154,8 @@ iothread_worker(void *pdata)
                 if (bfenv_iothread_sigwrite_test(iothread)) {
                     retval = iothread_signal(iothread, request);
                     if (bfdev_unlikely(retval)) {
-                        bfdev_log_notice("worker send write done signal failed: %d\n", retval);
-                        goto failed;
+                        bfdev_log_err("worker send write signal failed: %d\n", retval);
+                        goto eexit;
                     }
                 }
                 break;
@@ -173,8 +177,8 @@ iothread_worker(void *pdata)
                 if (bfenv_iothread_sigsync_test(iothread)) {
                     retval = iothread_signal(iothread, request);
                     if (bfdev_unlikely(retval)) {
-                        bfdev_log_notice("worker send write done signal failed: %d\n", retval);
-                        goto failed;
+                        bfdev_log_err("worker send sync signal failed: %d\n", retval);
+                        goto eexit;
                     }
                 }
                 break;
@@ -188,14 +192,17 @@ iothread_worker(void *pdata)
         continue;
 
 failed:
-        pthread_mutex_lock(&iothread->mutex);
         request.error = retval;
         retval = iothread_signal(iothread, request);
-        BFDEV_BUG_ON(retval);
-        pthread_mutex_unlock(&iothread->mutex);
+        if (bfdev_unlikely(retval)) {
+            bfdev_log_err("worker send error signal failed: %d\n", retval);
+            goto eexit;
+        }
     }
 
-    return 0;
+eexit:
+    iothread->error = retval;
+    return NULL;
 }
 
 export int
@@ -249,12 +256,6 @@ bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned l
         goto failed_free_eventfd;
     }
 
-    retval = pthread_mutex_init(&iothread->mutex, NULL);
-    if (bfdev_unlikely(retval)) {
-        bfdev_log_err("failed to init mutex\n");
-        goto failed_free_sem;
-    }
-
     iothread->alloc = alloc;
     iothread->flags = flags;
     bfdev_list_head_init(&iothread->pending_dones);
@@ -262,13 +263,11 @@ bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned l
     retval = pthread_create(&iothread->worker_thread, NULL, iothread_worker, iothread);
     if (bfdev_unlikely(retval)) {
         bfdev_log_err("failed to create read worker\n");
-        goto failed_mutex;
+        goto failed_free_sem;
     }
 
     return iothread;
 
-failed_mutex:
-    pthread_mutex_destroy(&iothread->mutex);
 failed_free_sem:
     sem_destroy(&iothread->pending);
 failed_free_eventfd:
@@ -288,12 +287,12 @@ bfenv_iothread_destory(bfenv_iothread_t *iothread)
     bfenv_iothread_request_t *pending, *tmp;
     const bfdev_alloc_t *alloc;
 
-    alloc = iothread->alloc;
     pthread_cancel(iothread->worker_thread);
-    pthread_mutex_destroy(&iothread->mutex);
+    pthread_join(iothread->worker_thread, NULL);
     sem_destroy(&iothread->pending);
     close(iothread->eventfd);
 
+    alloc = iothread->alloc;
     bfdev_list_for_each_entry_safe(pending, tmp,
         &iothread->pending_dones, pending)
         bfdev_free(alloc, pending);
