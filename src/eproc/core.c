@@ -159,7 +159,7 @@ bfenv_eproc_destory(bfenv_eproc_t *eproc)
     func->destory(eproc);
 }
 
-extern int
+export int
 bfenv_eproc_func_register(bfenv_eproc_func_t *func)
 {
     if (eproc_funcs_find(func->name))
@@ -170,7 +170,7 @@ bfenv_eproc_func_register(bfenv_eproc_func_t *func)
     return -BFDEV_ENOERR;
 }
 
-extern void
+export void
 bfenv_eproc_func_unregister(bfenv_eproc_func_t *func)
 {
     if (!eproc_funcs_exist(func))

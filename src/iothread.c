@@ -281,7 +281,7 @@ failed_free_alloc:
     return NULL;
 }
 
-extern void
+export void
 bfenv_iothread_destory(bfenv_iothread_t *iothread)
 {
     bfenv_iothread_request_t *pending, *tmp;
