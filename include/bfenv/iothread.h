@@ -15,6 +15,10 @@
 
 BFDEV_BEGIN_DECLS
 
+#ifndef BFENV_IOTHREAD_POLLMS
+# define BFENV_IOTHREAD_POLLMS 20
+#endif
+
 typedef struct bfenv_iothread bfenv_iothread_t;
 typedef struct bfenv_iothread_request bfenv_iothread_request_t;
 typedef enum bfenv_iothread_signal bfenv_iothread_signal_t;
@@ -62,6 +66,11 @@ struct bfenv_iothread {
     bfdev_list_head_t pending_dones;
 };
 
+BFDEV_CALLBACK_RELEASE(
+    bfenv_iothread_release_t,
+    bfenv_iothread_request_t *
+);
+
 BFDEV_BITFLAGS_STRUCT(
     bfenv_iothread_sigread,
     bfenv_iothread_t, flags,
@@ -81,16 +90,20 @@ BFDEV_BITFLAGS_STRUCT(
 );
 
 extern int
-bfenv_iothread_append(bfenv_iothread_t *iothread, bfenv_iothread_request_t request);
+bfenv_iothread_append(bfenv_iothread_t *iothread,
+                      bfenv_iothread_request_t request);
 
 extern bfenv_iothread_t *
-bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth, unsigned long flags);
+bfenv_iothread_create(const bfdev_alloc_t *alloc, unsigned int depth,
+                      unsigned long flags);
 
 extern void
-bfenv_iothread_destory(bfenv_iothread_t *iothread);
+bfenv_iothread_destory(bfenv_iothread_t *iothread,
+                       bfenv_iothread_release_t release, void *pdata);
 
 static inline int
-bfenv_iothread_read(bfenv_iothread_t *iothread, int fd, void *buffer, size_t nbytes)
+bfenv_iothread_read(bfenv_iothread_t *iothread, int fd,
+                    void *buffer, size_t nbytes)
 {
     bfenv_iothread_request_t request;
 
@@ -104,7 +117,8 @@ bfenv_iothread_read(bfenv_iothread_t *iothread, int fd, void *buffer, size_t nby
 }
 
 static inline int
-bfenv_iothread_write(bfenv_iothread_t *iothread, int fd, const void *buffer, size_t nbytes)
+bfenv_iothread_write(bfenv_iothread_t *iothread, int fd,
+                     const void *buffer, size_t nbytes)
 {
     bfenv_iothread_request_t request;
 
@@ -118,7 +132,8 @@ bfenv_iothread_write(bfenv_iothread_t *iothread, int fd, const void *buffer, siz
 }
 
 static inline int
-bfenv_iothread_sync(bfenv_iothread_t *iothread, int fd, void *buffer, size_t nbytes)
+bfenv_iothread_sync(bfenv_iothread_t *iothread, int fd,
+                    void *buffer, size_t nbytes)
 {
     bfenv_iothread_request_t request;
 

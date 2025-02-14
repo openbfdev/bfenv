@@ -17,7 +17,8 @@
 #include <export.h>
 
 static int
-iothread_signal_write(bfenv_iothread_t *iothread, bfenv_iothread_request_t request)
+iothread_signal_write(bfenv_iothread_t *iothread,
+                      bfenv_iothread_request_t request)
 {
     unsigned long count;
     int retval;
@@ -80,11 +81,34 @@ iothread_signal(bfenv_iothread_t *iothread, bfenv_iothread_request_t request)
     return -BFDEV_ENOERR;
 }
 
+static int
+iothread_wait(bfenv_iothread_t *iothread, struct timespec *time)
+{
+    int retval;
+
+    if (bfdev_list_check_empty(&iothread->pending_dones))
+        retval = sem_wait(&iothread->pending);
+    else
+        retval = sem_timedwait(&iothread->pending, time);
+
+    if (bfdev_unlikely(retval < 0)) {
+        if (errno != ETIMEDOUT)
+            return errno;
+    }
+
+    retval = iothread_signal_flush(iothread);
+    if (bfdev_unlikely(retval))
+        return retval;
+
+    return -BFDEV_ENOERR;
+}
+
 static void *
 iothread_worker(void *pdata)
 {
     bfenv_iothread_request_t request;
     bfenv_iothread_t *iothread;
+    struct timespec polltime;
     unsigned long avail;
     ssize_t length;
     int retval;
@@ -92,11 +116,13 @@ iothread_worker(void *pdata)
     iothread = pdata;
     retval = 0;
 
+    polltime.tv_sec = BFENV_IOTHREAD_POLLMS / 1000;
+    polltime.tv_nsec = (BFENV_IOTHREAD_POLLMS % 1000) * 1000000;
+
     for (;;) {
-        retval = sem_wait(&iothread->pending);
+        retval = iothread_wait(iothread, &polltime);
         if (bfdev_unlikely(retval)) {
-            bfdev_log_notice("worker semaphore wait failed: %d\n", errno);
-            retval = errno;
+            bfdev_log_notice("worker wait failed: %d\n", retval);
             goto eexit;
         }
 
@@ -282,9 +308,10 @@ failed_free_alloc:
 }
 
 export void
-bfenv_iothread_destory(bfenv_iothread_t *iothread)
+bfenv_iothread_destory(bfenv_iothread_t *iothread,
+                       bfenv_iothread_release_t release, void *pdata)
 {
-    bfenv_iothread_request_t *pending, *tmp;
+    bfenv_iothread_request_t request, *pending, *tmp;
     const bfdev_alloc_t *alloc;
 
     pthread_cancel(iothread->worker_thread);
@@ -294,8 +321,16 @@ bfenv_iothread_destory(bfenv_iothread_t *iothread)
 
     alloc = iothread->alloc;
     bfdev_list_for_each_entry_safe(pending, tmp,
-        &iothread->pending_dones, pending)
+        &iothread->pending_dones, pending) {
+        if (release)
+            release(pending, pdata);
         bfdev_free(alloc, pending);
+    }
+
+    while (bfdev_fifo_get(&iothread->pending_works, &request)) {
+        if (release)
+            release(pending, pdata);
+    }
 
     bfdev_fifo_free(&iothread->done_works);
     bfdev_fifo_free(&iothread->pending_works);
