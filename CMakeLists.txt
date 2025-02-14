@@ -40,15 +40,18 @@ string(APPEND BFENV_RELEASE
 )
 
 option(BFENV_DEVEL "Enable development mode" OFF)
-option(BFENV_STRICT "Enable strict compilation" ON)
+option(BFENV_STRICT "Enable strict compilation" OFF)
 option(BFENV_EXAMPLES "Build examples" OFF)
+option(BFENV_DOCS "Install Documentation" OFF)
 
 option(BFENV_ASAN "Enable Address Sanitizer" OFF)
 option(BFENV_UBSAN "Enable Undefined Behaviour Sanitizer" OFF)
 option(BFENV_GCOV "Enable Code Coverage Test" OFF)
 
 if(BFENV_DEVEL)
+    set(BFENV_STRICT ON)
     set(BFENV_EXAMPLES ON)
+    set(BFENV_DOCS ON)
     set(BFENV_ASAN ON)
     set(BFENV_UBSAN ON)
     set(BFENV_GCOV ON)
@@ -99,9 +102,10 @@ if(${CMAKE_PROJECT_NAME} STREQUAL "bfenv")
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
-    install(FILES
-        ${PROJECT_SOURCE_DIR}/COPYING
-        DESTINATION ${CMAKE_INSTALL_DOCDIR}
+    install(DIRECTORY
+        ${BFENV_HEADER_PATH}/bfenv
+        ${BFENV_GENERATED_PATH}/bfenv
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
     install(FILES
@@ -109,15 +113,16 @@ if(${CMAKE_PROJECT_NAME} STREQUAL "bfenv")
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bfenv
     )
 
-    install(DIRECTORY
-        ${BFENV_HEADER_PATH}/bfenv
-        ${BFENV_GENERATED_PATH}/bfenv
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    )
-
     install(TARGETS
         bfenv_static bfenv_shared
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+
+    if(BFENV_DOCS)
+        install(FILES
+            ${PROJECT_SOURCE_DIR}/COPYING
+            DESTINATION ${CMAKE_INSTALL_DOCDIR}
+        )
+    endif()
 endif()
