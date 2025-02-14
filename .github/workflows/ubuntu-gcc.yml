@@ -32,7 +32,7 @@ jobs:
 
       - name: install environment
         run: |
-          wget https://github.com/openbfdev/bfdev-package/raw/refs/heads/main/bfdev-linux-amd64.tar.gz
+          wget https://github.com/openbfdev/bfdev/releases/download/nightly/bfdev-linux-amd64.tar.gz
           sudo tar -xzvf bfdev-linux-amd64.tar.gz -C /usr
 
       - name: configure cmake
